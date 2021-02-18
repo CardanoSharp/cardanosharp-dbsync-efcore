@@ -17,7 +17,6 @@ namespace CardanoSharp.DbSync.EntityFramework
         {
             _config = config;
         }
-
         public virtual DbSet<Block> Blocks { get; set; }
         public virtual DbSet<Delegation> Delegations { get; set; }
         public virtual DbSet<Epoch> Epoches { get; set; }
@@ -26,6 +25,7 @@ namespace CardanoSharp.DbSync.EntityFramework
         public virtual DbSet<MaTxMint> MaTxMints { get; set; }
         public virtual DbSet<MaTxOut> MaTxOuts { get; set; }
         public virtual DbSet<Metum> Meta { get; set; }
+        public virtual DbSet<OrphanedReward> OrphanedRewards { get; set; }
         public virtual DbSet<ParamProposal> ParamProposals { get; set; }
         public virtual DbSet<PoolHash> PoolHashes { get; set; }
         public virtual DbSet<PoolMetaDatum> PoolMetaData { get; set; }
@@ -70,6 +70,8 @@ namespace CardanoSharp.DbSync.EntityFramework
 
                 entity.HasIndex(e => e.PreviousId, "idx_block_previous_id");
 
+                entity.HasIndex(e => e.SlotLeaderId, "idx_block_slot_leader_id");
+
                 entity.HasIndex(e => e.SlotNo, "idx_block_slot_no");
 
                 entity.HasIndex(e => e.Time, "idx_block_time");
@@ -89,7 +91,7 @@ namespace CardanoSharp.DbSync.EntityFramework
                     .IsRequired()
                     .HasColumnName("hash");
 
-                entity.Property(e => e.MerkelRoot).HasColumnName("merkel_root");
+                entity.Property(e => e.MerkleRoot).HasColumnName("merkle_root");
 
                 entity.Property(e => e.OpCert).HasColumnName("op_cert");
 
@@ -116,18 +118,26 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.Previous)
                     .WithMany(p => p.InversePrevious)
                     .HasForeignKey(d => d.PreviousId)
+                    .OnDelete(DeleteBehavior.Cascade)
                     .HasConstraintName("block_previous_id_fkey");
 
                 entity.HasOne(d => d.SlotLeader)
                     .WithMany(p => p.Blocks)
                     .HasForeignKey(d => d.SlotLeaderId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("block_slot_leader_id_fkey");
             });
 
             modelBuilder.Entity<Delegation>(entity =>
             {
                 entity.ToTable("delegation");
+
+                entity.HasIndex(e => e.ActiveEpochNo, "idx_delegation_active_epoch_no");
+
+                entity.HasIndex(e => e.AddrId, "idx_delegation_addr_id");
+
+                entity.HasIndex(e => e.PoolHashId, "idx_delegation_pool_hash_id");
+
+                entity.HasIndex(e => e.TxId, "idx_delegation_tx_id");
 
                 entity.HasIndex(e => new { e.AddrId, e.PoolHashId, e.TxId }, "unique_delegation")
                     .IsUnique();
@@ -147,19 +157,16 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.Addr)
                     .WithMany(p => p.Delegations)
                     .HasForeignKey(d => d.AddrId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("delegation_addr_id_fkey");
 
                 entity.HasOne(d => d.PoolHash)
                     .WithMany(p => p.Delegations)
                     .HasForeignKey(d => d.PoolHashId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("delegation_pool_hash_id_fkey");
 
                 entity.HasOne(d => d.Tx)
                     .WithMany(p => p.Delegations)
                     .HasForeignKey(d => d.TxId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("delegation_tx_id_fkey");
             });
 
@@ -194,6 +201,8 @@ namespace CardanoSharp.DbSync.EntityFramework
             modelBuilder.Entity<EpochParam>(entity =>
             {
                 entity.ToTable("epoch_param");
+
+                entity.HasIndex(e => e.BlockId, "idx_epoch_param_block_id");
 
                 entity.HasIndex(e => new { e.EpochNo, e.BlockId }, "unique_epoch_param")
                     .IsUnique();
@@ -253,13 +262,18 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.Block)
                     .WithMany(p => p.EpochParams)
                     .HasForeignKey(d => d.BlockId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("epoch_param_block_id_fkey");
             });
 
             modelBuilder.Entity<EpochStake>(entity =>
             {
                 entity.ToTable("epoch_stake");
+
+                entity.HasIndex(e => e.AddrId, "idx_epoch_stake_addr_id");
+
+                entity.HasIndex(e => e.BlockId, "idx_epoch_stake_block_id");
+
+                entity.HasIndex(e => e.PoolId, "idx_epoch_stake_pool_id");
 
                 entity.HasIndex(e => new { e.AddrId, e.EpochNo }, "unique_stake")
                     .IsUnique();
@@ -281,25 +295,24 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.Addr)
                     .WithMany(p => p.EpochStakes)
                     .HasForeignKey(d => d.AddrId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("epoch_stake_addr_id_fkey");
 
                 entity.HasOne(d => d.Block)
                     .WithMany(p => p.EpochStakes)
                     .HasForeignKey(d => d.BlockId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("epoch_stake_block_id_fkey");
 
                 entity.HasOne(d => d.Pool)
                     .WithMany(p => p.EpochStakes)
                     .HasForeignKey(d => d.PoolId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("epoch_stake_pool_id_fkey");
             });
 
             modelBuilder.Entity<MaTxMint>(entity =>
             {
                 entity.ToTable("ma_tx_mint");
+
+                entity.HasIndex(e => e.TxId, "idx_ma_tx_mint_tx_id");
 
                 entity.HasIndex(e => new { e.Policy, e.Name, e.TxId }, "unique_ma_tx_mint")
                     .IsUnique();
@@ -323,13 +336,14 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.Tx)
                     .WithMany(p => p.MaTxMints)
                     .HasForeignKey(d => d.TxId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("ma_tx_mint_tx_id_fkey");
             });
 
             modelBuilder.Entity<MaTxOut>(entity =>
             {
                 entity.ToTable("ma_tx_out");
+
+                entity.HasIndex(e => e.TxOutId, "idx_ma_tx_out_tx_out_id");
 
                 entity.HasIndex(e => new { e.Policy, e.Name, e.TxOutId }, "unique_ma_tx_out")
                     .IsUnique();
@@ -353,7 +367,6 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.TxOut)
                     .WithMany(p => p.MaTxOuts)
                     .HasForeignKey(d => d.TxOutId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("ma_tx_out_tx_out_id_fkey");
             });
 
@@ -374,9 +387,54 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.Property(e => e.StartTime).HasColumnName("start_time");
             });
 
+            modelBuilder.Entity<OrphanedReward>(entity =>
+            {
+                entity.ToTable("orphaned_reward");
+
+                entity.HasIndex(e => e.AddrId, "idx_orphaned_reward_addr_id");
+
+                entity.HasIndex(e => e.BlockId, "idx_orphaned_reward_block_id");
+
+                entity.HasIndex(e => e.PoolId, "idx_orphaned_reward_pool_id");
+
+                entity.HasIndex(e => new { e.AddrId, e.BlockId }, "unique_orphaned")
+                    .IsUnique();
+
+                entity.Property(e => e.Id).HasColumnName("id");
+
+                entity.Property(e => e.AddrId).HasColumnName("addr_id");
+
+                entity.Property(e => e.Amount)
+                    .HasPrecision(20)
+                    .HasColumnName("amount");
+
+                entity.Property(e => e.BlockId).HasColumnName("block_id");
+
+                entity.Property(e => e.EpochNo).HasColumnName("epoch_no");
+
+                entity.Property(e => e.PoolId).HasColumnName("pool_id");
+
+                entity.HasOne(d => d.Addr)
+                    .WithMany(p => p.OrphanedRewards)
+                    .HasForeignKey(d => d.AddrId)
+                    .HasConstraintName("orphaned_reward_addr_id_fkey");
+
+                entity.HasOne(d => d.Block)
+                    .WithMany(p => p.OrphanedRewards)
+                    .HasForeignKey(d => d.BlockId)
+                    .HasConstraintName("orphaned_reward_block_id_fkey");
+
+                entity.HasOne(d => d.Pool)
+                    .WithMany(p => p.OrphanedRewards)
+                    .HasForeignKey(d => d.PoolId)
+                    .HasConstraintName("orphaned_reward_pool_id_fkey");
+            });
+
             modelBuilder.Entity<ParamProposal>(entity =>
             {
                 entity.ToTable("param_proposal");
+
+                entity.HasIndex(e => e.RegisteredTxId, "idx_param_proposal_registered_tx_id");
 
                 entity.HasIndex(e => new { e.Key, e.RegisteredTxId }, "unique_param_proposal")
                     .IsUnique();
@@ -438,7 +496,6 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.RegisteredTx)
                     .WithMany(p => p.ParamProposals)
                     .HasForeignKey(d => d.RegisteredTxId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("param_proposal_registered_tx_id_fkey");
             });
 
@@ -465,6 +522,8 @@ namespace CardanoSharp.DbSync.EntityFramework
             {
                 entity.ToTable("pool_meta_data");
 
+                entity.HasIndex(e => e.RegisteredTxId, "idx_pool_meta_data_registered_tx_id");
+
                 entity.HasIndex(e => new { e.Url, e.Hash }, "unique_pool_meta_data")
                     .IsUnique();
 
@@ -484,13 +543,16 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.RegisteredTx)
                     .WithMany(p => p.PoolMetaData)
                     .HasForeignKey(d => d.RegisteredTxId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("pool_meta_data_registered_tx_id_fkey");
             });
 
             modelBuilder.Entity<PoolOwner>(entity =>
             {
                 entity.ToTable("pool_owner");
+
+                entity.HasIndex(e => e.PoolHashId, "idx_pool_owner_pool_hash_id");
+
+                entity.HasIndex(e => e.RegisteredTxId, "idx_pool_owner_registered_tx_id");
 
                 entity.HasIndex(e => new { e.Hash, e.PoolHashId, e.RegisteredTxId }, "unique_pool_owner")
                     .IsUnique();
@@ -508,19 +570,19 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.PoolHash)
                     .WithMany(p => p.PoolOwners)
                     .HasForeignKey(d => d.PoolHashId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("pool_owner_pool_hash_id_fkey");
 
                 entity.HasOne(d => d.RegisteredTx)
                     .WithMany(p => p.PoolOwners)
                     .HasForeignKey(d => d.RegisteredTxId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("pool_owner_registered_tx_id_fkey");
             });
 
             modelBuilder.Entity<PoolRelay>(entity =>
             {
                 entity.ToTable("pool_relay");
+
+                entity.HasIndex(e => e.UpdateId, "idx_pool_relay_update_id");
 
                 entity.HasIndex(e => new { e.UpdateId, e.Ipv4, e.Ipv6, e.DnsName }, "unique_pool_relay")
                     .IsUnique();
@@ -550,13 +612,16 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.Update)
                     .WithMany(p => p.PoolRelays)
                     .HasForeignKey(d => d.UpdateId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("pool_relay_update_id_fkey");
             });
 
             modelBuilder.Entity<PoolRetire>(entity =>
             {
                 entity.ToTable("pool_retire");
+
+                entity.HasIndex(e => e.AnnouncedTxId, "idx_pool_retire_announced_tx_id");
+
+                entity.HasIndex(e => e.HashId, "idx_pool_retire_hash_id");
 
                 entity.HasIndex(e => new { e.HashId, e.AnnouncedTxId }, "unique_pool_retiring")
                     .IsUnique();
@@ -574,13 +639,11 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.AnnouncedTx)
                     .WithMany(p => p.PoolRetires)
                     .HasForeignKey(d => d.AnnouncedTxId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("pool_retire_announced_tx_id_fkey");
 
                 entity.HasOne(d => d.Hash)
                     .WithMany(p => p.PoolRetires)
                     .HasForeignKey(d => d.HashId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("pool_retire_hash_id_fkey");
             });
 
@@ -588,7 +651,15 @@ namespace CardanoSharp.DbSync.EntityFramework
             {
                 entity.ToTable("pool_update");
 
+                entity.HasIndex(e => e.ActiveEpochNo, "idx_pool_update_active_epoch_no");
+
                 entity.HasIndex(e => e.HashId, "idx_pool_update_hash_id");
+
+                entity.HasIndex(e => e.MetaId, "idx_pool_update_meta_id");
+
+                entity.HasIndex(e => e.RegisteredTxId, "idx_pool_update_registered_tx_id");
+
+                entity.HasIndex(e => e.RewardAddr, "idx_pool_update_reward_addr");
 
                 entity.HasIndex(e => new { e.HashId, e.RegisteredTxId }, "unique_pool_update")
                     .IsUnique();
@@ -626,24 +697,27 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.Hash)
                     .WithMany(p => p.PoolUpdates)
                     .HasForeignKey(d => d.HashId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("pool_update_hash_id_fkey");
 
                 entity.HasOne(d => d.Meta)
                     .WithMany(p => p.PoolUpdates)
                     .HasForeignKey(d => d.MetaId)
+                    .OnDelete(DeleteBehavior.Cascade)
                     .HasConstraintName("pool_update_meta_id_fkey");
 
                 entity.HasOne(d => d.RegisteredTx)
                     .WithMany(p => p.PoolUpdates)
                     .HasForeignKey(d => d.RegisteredTxId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("pool_update_registered_tx_id_fkey");
             });
 
             modelBuilder.Entity<Reserve>(entity =>
             {
                 entity.ToTable("reserve");
+
+                entity.HasIndex(e => e.AddrId, "idx_reserve_addr_id");
+
+                entity.HasIndex(e => e.TxId, "idx_reserve_tx_id");
 
                 entity.HasIndex(e => new { e.AddrId, e.TxId }, "unique_reserves")
                     .IsUnique();
@@ -663,19 +737,23 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.Addr)
                     .WithMany(p => p.Reserves)
                     .HasForeignKey(d => d.AddrId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("reserve_addr_id_fkey");
 
                 entity.HasOne(d => d.Tx)
                     .WithMany(p => p.Reserves)
                     .HasForeignKey(d => d.TxId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("reserve_tx_id_fkey");
             });
 
             modelBuilder.Entity<Reward>(entity =>
             {
                 entity.ToTable("reward");
+
+                entity.HasIndex(e => e.AddrId, "idx_reward_addr_id");
+
+                entity.HasIndex(e => e.BlockId, "idx_reward_block_id");
+
+                entity.HasIndex(e => e.PoolId, "idx_reward_pool_id");
 
                 entity.HasIndex(e => new { e.AddrId, e.BlockId }, "unique_reward")
                     .IsUnique();
@@ -697,19 +775,16 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.Addr)
                     .WithMany(p => p.Rewards)
                     .HasForeignKey(d => d.AddrId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("reward_addr_id_fkey");
 
                 entity.HasOne(d => d.Block)
                     .WithMany(p => p.Rewards)
                     .HasForeignKey(d => d.BlockId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("reward_block_id_fkey");
 
                 entity.HasOne(d => d.Pool)
                     .WithMany(p => p.Rewards)
                     .HasForeignKey(d => d.PoolId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("reward_pool_id_fkey");
             });
 
@@ -730,6 +805,8 @@ namespace CardanoSharp.DbSync.EntityFramework
             {
                 entity.ToTable("slot_leader");
 
+                entity.HasIndex(e => e.PoolHashId, "idx_slot_leader_pool_hash_id");
+
                 entity.HasIndex(e => e.Hash, "unique_slot_leader")
                     .IsUnique();
 
@@ -749,12 +826,17 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.PoolHash)
                     .WithMany(p => p.SlotLeaders)
                     .HasForeignKey(d => d.PoolHashId)
+                    .OnDelete(DeleteBehavior.Cascade)
                     .HasConstraintName("slot_leader_pool_hash_id_fkey");
             });
 
             modelBuilder.Entity<StakeAddress>(entity =>
             {
                 entity.ToTable("stake_address");
+
+                entity.HasIndex(e => e.HashRaw, "idx_stake_address_hash_raw");
+
+                entity.HasIndex(e => e.RegisteredTxId, "idx_stake_address_registered_tx_id");
 
                 entity.HasIndex(e => e.HashRaw, "unique_stake_address")
                     .IsUnique();
@@ -775,13 +857,16 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.RegisteredTx)
                     .WithMany(p => p.StakeAddresses)
                     .HasForeignKey(d => d.RegisteredTxId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("stake_address_registered_tx_id_fkey");
             });
 
             modelBuilder.Entity<StakeDeregistration>(entity =>
             {
                 entity.ToTable("stake_deregistration");
+
+                entity.HasIndex(e => e.AddrId, "idx_stake_deregistration_addr_id");
+
+                entity.HasIndex(e => e.TxId, "idx_stake_deregistration_tx_id");
 
                 entity.HasIndex(e => new { e.AddrId, e.TxId }, "unique_stake_deregistration")
                     .IsUnique();
@@ -797,19 +882,21 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.Addr)
                     .WithMany(p => p.StakeDeregistrations)
                     .HasForeignKey(d => d.AddrId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("stake_deregistration_addr_id_fkey");
 
                 entity.HasOne(d => d.Tx)
                     .WithMany(p => p.StakeDeregistrations)
                     .HasForeignKey(d => d.TxId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("stake_deregistration_tx_id_fkey");
             });
 
             modelBuilder.Entity<StakeRegistration>(entity =>
             {
                 entity.ToTable("stake_registration");
+
+                entity.HasIndex(e => e.AddrId, "idx_stake_registration_addr_id");
+
+                entity.HasIndex(e => e.TxId, "idx_stake_registration_tx_id");
 
                 entity.HasIndex(e => new { e.AddrId, e.TxId }, "unique_stake_registration")
                     .IsUnique();
@@ -825,19 +912,21 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.Addr)
                     .WithMany(p => p.StakeRegistrations)
                     .HasForeignKey(d => d.AddrId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("stake_registration_addr_id_fkey");
 
                 entity.HasOne(d => d.Tx)
                     .WithMany(p => p.StakeRegistrations)
                     .HasForeignKey(d => d.TxId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("stake_registration_tx_id_fkey");
             });
 
             modelBuilder.Entity<Treasury>(entity =>
             {
                 entity.ToTable("treasury");
+
+                entity.HasIndex(e => e.AddrId, "idx_treasury_addr_id");
+
+                entity.HasIndex(e => e.TxId, "idx_treasury_tx_id");
 
                 entity.HasIndex(e => new { e.AddrId, e.TxId }, "unique_treasury")
                     .IsUnique();
@@ -857,13 +946,11 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.Addr)
                     .WithMany(p => p.Treasuries)
                     .HasForeignKey(d => d.AddrId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("treasury_addr_id_fkey");
 
                 entity.HasOne(d => d.Tx)
                     .WithMany(p => p.Treasuries)
                     .HasForeignKey(d => d.TxId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("treasury_tx_id_fkey");
             });
 
@@ -909,7 +996,6 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.Block)
                     .WithMany(p => p.Txes)
                     .HasForeignKey(d => d.BlockId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("tx_block_id_fkey");
             });
 
@@ -918,6 +1004,10 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.ToTable("tx_in");
 
                 entity.HasIndex(e => e.TxInId, "idx_tx_in_source_tx");
+
+                entity.HasIndex(e => e.TxInId, "idx_tx_in_tx_in_id");
+
+                entity.HasIndex(e => e.TxOutId, "idx_tx_in_tx_out_id");
 
                 entity.HasIndex(e => new { e.TxOutId, e.TxOutIndex }, "unique_txin")
                     .IsUnique();
@@ -933,19 +1023,19 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.TxInNavigation)
                     .WithMany(p => p.TxInTxInNavigations)
                     .HasForeignKey(d => d.TxInId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("tx_in_tx_in_id_fkey");
 
                 entity.HasOne(d => d.TxOut)
                     .WithMany(p => p.TxInTxOuts)
                     .HasForeignKey(d => d.TxOutId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("tx_in_tx_out_id_fkey");
             });
 
             modelBuilder.Entity<TxMetadatum>(entity =>
             {
                 entity.ToTable("tx_metadata");
+
+                entity.HasIndex(e => e.TxId, "idx_tx_metadata_tx_id");
 
                 entity.HasIndex(e => new { e.Key, e.TxId }, "unique_tx_metadata")
                     .IsUnique();
@@ -969,7 +1059,6 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.Tx)
                     .WithMany(p => p.TxMetadata)
                     .HasForeignKey(d => d.TxId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("tx_metadata_tx_id_fkey");
             });
 
@@ -981,6 +1070,10 @@ namespace CardanoSharp.DbSync.EntityFramework
                     .HasMethod("hash");
 
                 entity.HasIndex(e => e.PaymentCred, "idx_tx_out_payment_cred");
+
+                entity.HasIndex(e => e.StakeAddressId, "idx_tx_out_stake_address_id");
+
+                entity.HasIndex(e => e.TxId, "idx_tx_out_tx_id");
 
                 entity.HasIndex(e => new { e.TxId, e.Index }, "unique_txout")
                     .IsUnique();
@@ -1011,12 +1104,12 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.StakeAddress)
                     .WithMany(p => p.TxOuts)
                     .HasForeignKey(d => d.StakeAddressId)
+                    .OnDelete(DeleteBehavior.Cascade)
                     .HasConstraintName("tx_out_stake_address_id_fkey");
 
                 entity.HasOne(d => d.Tx)
                     .WithMany(p => p.TxOuts)
                     .HasForeignKey(d => d.TxId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("tx_out_tx_id_fkey");
             });
 
@@ -1051,6 +1144,10 @@ namespace CardanoSharp.DbSync.EntityFramework
             {
                 entity.ToTable("withdrawal");
 
+                entity.HasIndex(e => e.AddrId, "idx_withdrawal_addr_id");
+
+                entity.HasIndex(e => e.TxId, "idx_withdrawal_tx_id");
+
                 entity.HasIndex(e => new { e.AddrId, e.TxId }, "unique_withdrawal")
                     .IsUnique();
 
@@ -1067,13 +1164,11 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasOne(d => d.Addr)
                     .WithMany(p => p.Withdrawals)
                     .HasForeignKey(d => d.AddrId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("withdrawal_addr_id_fkey");
 
                 entity.HasOne(d => d.Tx)
                     .WithMany(p => p.Withdrawals)
                     .HasForeignKey(d => d.TxId)
-                    .OnDelete(DeleteBehavior.ClientSetNull)
                     .HasConstraintName("withdrawal_tx_id_fkey");
             });
 

@@ -12,6 +12,7 @@ namespace CardanoSharp.DbSync.EntityFramework.Models
             EpochParams = new HashSet<EpochParam>();
             EpochStakes = new HashSet<EpochStake>();
             InversePrevious = new HashSet<Block>();
+            OrphanedRewards = new HashSet<OrphanedReward>();
             Rewards = new HashSet<Reward>();
             Txes = new HashSet<Tx>();
         }
@@ -23,7 +24,7 @@ namespace CardanoSharp.DbSync.EntityFramework.Models
         public int? EpochSlotNo { get; set; }
         public int? BlockNo { get; set; }
         public long? PreviousId { get; set; }
-        public byte[] MerkelRoot { get; set; }
+        public byte[] MerkleRoot { get; set; }
         public long SlotLeaderId { get; set; }
         public int Size { get; set; }
         public DateTime Time { get; set; }
@@ -38,6 +39,7 @@ namespace CardanoSharp.DbSync.EntityFramework.Models
         public virtual ICollection<EpochParam> EpochParams { get; set; }
         public virtual ICollection<EpochStake> EpochStakes { get; set; }
         public virtual ICollection<Block> InversePrevious { get; set; }
+        public virtual ICollection<OrphanedReward> OrphanedRewards { get; set; }
         public virtual ICollection<Reward> Rewards { get; set; }
         public virtual ICollection<Tx> Txes { get; set; }
     }
