@@ -11,6 +11,7 @@ namespace CardanoSharp.DbSync.EntityFramework.Models
         {
             Delegations = new HashSet<Delegation>();
             EpochStakes = new HashSet<EpochStake>();
+            OrphanedRewards = new HashSet<OrphanedReward>();
             Reserves = new HashSet<Reserve>();
             Rewards = new HashSet<Reward>();
             StakeDeregistrations = new HashSet<StakeDeregistration>();
@@ -28,6 +29,7 @@ namespace CardanoSharp.DbSync.EntityFramework.Models
         public virtual Tx RegisteredTx { get; set; }
         public virtual ICollection<Delegation> Delegations { get; set; }
         public virtual ICollection<EpochStake> EpochStakes { get; set; }
+        public virtual ICollection<OrphanedReward> OrphanedRewards { get; set; }
         public virtual ICollection<Reserve> Reserves { get; set; }
         public virtual ICollection<Reward> Rewards { get; set; }
         public virtual ICollection<StakeDeregistration> StakeDeregistrations { get; set; }
