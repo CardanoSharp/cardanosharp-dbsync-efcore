@@ -17,6 +17,8 @@ namespace CardanoSharp.DbSync.EntityFramework
         {
             _config = config;
         }
+        public virtual DbSet<AdaPot> AdaPots { get; set; }
+        public virtual DbSet<Asset> Assets { get; set; }
         public virtual DbSet<Block> Blocks { get; set; }
         public virtual DbSet<Delegation> Delegations { get; set; }
         public virtual DbSet<Epoch> Epoches { get; set; }
@@ -58,7 +60,86 @@ namespace CardanoSharp.DbSync.EntityFramework
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.HasAnnotation("Relational:Collation", "en_US.UTF-8");
+            modelBuilder.HasPostgresExtension("pgcrypto")
+                .HasAnnotation("Relational:Collation", "en_US.UTF-8");
+
+            modelBuilder.Entity<AdaPot>(entity =>
+            {
+                entity.ToTable("ada_pots");
+
+                entity.HasIndex(e => e.BlockId, "unique_ada_pots")
+                    .IsUnique();
+
+                entity.Property(e => e.Id).HasColumnName("id");
+
+                entity.Property(e => e.BlockId).HasColumnName("block_id");
+
+                entity.Property(e => e.Deposits)
+                    .HasPrecision(20)
+                    .HasColumnName("deposits");
+
+                entity.Property(e => e.EpochNo).HasColumnName("epoch_no");
+
+                entity.Property(e => e.Fees)
+                    .HasPrecision(20)
+                    .HasColumnName("fees");
+
+                entity.Property(e => e.Reserves)
+                    .HasPrecision(20)
+                    .HasColumnName("reserves");
+
+                entity.Property(e => e.Rewards)
+                    .HasPrecision(20)
+                    .HasColumnName("rewards");
+
+                entity.Property(e => e.SlotNo).HasColumnName("slot_no");
+
+                entity.Property(e => e.Treasury)
+                    .HasPrecision(20)
+                    .HasColumnName("treasury");
+
+                entity.Property(e => e.Utxo)
+                    .HasPrecision(20)
+                    .HasColumnName("utxo");
+
+                entity.HasOne(d => d.Block)
+                    .WithOne(p => p.AdaPot)
+                    .HasForeignKey<AdaPot>(d => d.BlockId)
+                    .HasConstraintName("ada_pots_block_id_fkey");
+            });
+
+            modelBuilder.Entity<Asset>(entity =>
+            {
+                entity.ToTable("Asset");
+
+                entity.Property(e => e.AssetId).HasColumnName("assetId");
+
+                entity.Property(e => e.AssetName).HasColumnName("assetName");
+
+                entity.Property(e => e.Description).HasColumnName("description");
+
+                entity.Property(e => e.Fingerprint)
+                    .HasMaxLength(44)
+                    .HasColumnName("fingerprint")
+                    .IsFixedLength(true);
+
+                entity.Property(e => e.Logo).HasColumnName("logo");
+
+                entity.Property(e => e.MetadataFetchAttempts).HasColumnName("metadataFetchAttempts");
+
+                entity.Property(e => e.MetadataHash)
+                    .HasMaxLength(40)
+                    .HasColumnName("metadataHash")
+                    .IsFixedLength(true);
+
+                entity.Property(e => e.Name).HasColumnName("name");
+
+                entity.Property(e => e.PolicyId).HasColumnName("policyId");
+
+                entity.Property(e => e.Ticker).HasColumnName("ticker");
+
+                entity.Property(e => e.Url).HasColumnName("url");
+            });
 
             modelBuilder.Entity<Block>(entity =>
             {
@@ -67,6 +148,8 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasIndex(e => e.BlockNo, "idx_block_block_no");
 
                 entity.HasIndex(e => e.EpochNo, "idx_block_epoch_no");
+
+                entity.HasIndex(e => e.Hash, "idx_block_hash");
 
                 entity.HasIndex(e => e.PreviousId, "idx_block_previous_id");
 
@@ -151,6 +234,8 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.Property(e => e.CertIndex).HasColumnName("cert_index");
 
                 entity.Property(e => e.PoolHashId).HasColumnName("pool_hash_id");
+
+                entity.Property(e => e.SlotNo).HasColumnName("slot_no");
 
                 entity.Property(e => e.TxId).HasColumnName("tx_id");
 
@@ -960,6 +1045,8 @@ namespace CardanoSharp.DbSync.EntityFramework
 
                 entity.HasIndex(e => e.BlockId, "idx_tx_block_id");
 
+                entity.HasIndex(e => e.Hash, "idx_tx_hash");
+
                 entity.HasIndex(e => e.Hash, "unique_tx")
                     .IsUnique();
 
@@ -1002,6 +1089,8 @@ namespace CardanoSharp.DbSync.EntityFramework
             modelBuilder.Entity<TxIn>(entity =>
             {
                 entity.ToTable("tx_in");
+
+                entity.HasIndex(e => e.TxOutId, "idx_tx_in_consuming_tx");
 
                 entity.HasIndex(e => e.TxInId, "idx_tx_in_source_tx");
 
@@ -1072,6 +1161,8 @@ namespace CardanoSharp.DbSync.EntityFramework
                 entity.HasIndex(e => e.PaymentCred, "idx_tx_out_payment_cred");
 
                 entity.HasIndex(e => e.StakeAddressId, "idx_tx_out_stake_address_id");
+
+                entity.HasIndex(e => e.TxId, "idx_tx_out_tx");
 
                 entity.HasIndex(e => e.TxId, "idx_tx_out_tx_id");
 

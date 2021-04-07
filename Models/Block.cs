@@ -36,6 +36,7 @@ namespace CardanoSharp.DbSync.EntityFramework.Models
 
         public virtual Block Previous { get; set; }
         public virtual SlotLeader SlotLeader { get; set; }
+        public virtual AdaPot AdaPot { get; set; }
         public virtual ICollection<EpochParam> EpochParams { get; set; }
         public virtual ICollection<EpochStake> EpochStakes { get; set; }
         public virtual ICollection<Block> InversePrevious { get; set; }

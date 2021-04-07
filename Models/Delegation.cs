@@ -13,6 +13,7 @@ namespace CardanoSharp.DbSync.EntityFramework.Models
         public long PoolHashId { get; set; }
         public long ActiveEpochNo { get; set; }
         public long TxId { get; set; }
+        public int SlotNo { get; set; }
 
         public virtual StakeAddress Addr { get; set; }
         public virtual PoolHash PoolHash { get; set; }
